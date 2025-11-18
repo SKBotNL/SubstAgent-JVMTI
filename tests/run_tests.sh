@@ -38,19 +38,37 @@ rm -rf ./build
 mkdir ./build
 
 # Compile tests
-echo -n "Compiling test "
-tests_count_digits=${#TESTS_COUNT}
+# echo -n "Compiling test "
+# tests_count_digits=${#TESTS_COUNT}
+# for (( TEST=1; TEST<=TESTS_COUNT; TEST++ )); do
+#     echo -n "$TEST/$TESTS_COUNT"
+#     javac Test$TEST.java -d ./build
+#     if [ $? -ne 0 ]; then
+        # echo -e "\e[0;31mCould not compile test $TEST\e[0m"
+        # exit 1
+#     fi
+#     test_digits=${#TEST}
+#     shift_left=$(( tests_count_digits + test_digits + 1 ))
+#     echo -ne "\e[${shift_left}D"
+# done
+# echo -ne "\e[2K\r"
+# echo "Done compiling tests"
+
+echo -n "Compiling tests..."
+pids=()
 for (( TEST=1; TEST<=TESTS_COUNT; TEST++ )); do
-    echo -n "$TEST/$TESTS_COUNT"
-    javac Test$TEST.java -d ./build
+    javac Test$TEST.java -d ./build &
+    pids+=($!)
+done
+
+for pid in "${pids[@]}"; do
+    wait "$pid"
     if [ $? -ne 0 ]; then
         echo -e "\e[0;31mCould not compile test $TEST\e[0m"
         exit 1
     fi
-    test_digits=${#TEST}
-    shift_left=$(( tests_count_digits + test_digits + 1 ))
-    echo -ne "\e[${shift_left}D"
 done
+
 echo -ne "\e[2K\r"
 echo "Done compiling tests"
 

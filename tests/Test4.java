@@ -4,8 +4,8 @@ import java.util.Arrays;
 
 // Test $SAME_LENGTH_ENV split in 2 byte arrays, only the read content overflows
 class Test4 {
-    static String correctFirstString = "Hi abcdefghijklmno ";
-    static String correctSecondString = "According to all known laws of aviation, there is no way a bee should be able to fly";
+    static String correctFirstString = "Hi abcdefghijklmno A";
+    static String correctSecondString = "ccording to all known laws of aviation, there is no way a bee should be able to fly";
 
     public static String toHexDump(String s) {
         byte[] bytes = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -34,7 +34,12 @@ class Test4 {
                 System.err.println("Correct output");
                 System.exit(0);
             } else {
-                System.out.printf("Incorrect output. Was \"%s\" should be \"%s\"\n", firstContentString + secondContentString, correctFirstString + correctSecondString);
+                System.out.println("=== Incorrect output ===");
+                System.out.printf("First content string was \"%s\", should be \"%s\"\n", firstContentString, correctFirstString);
+                System.out.printf("First content string hex: \"%s\"\n", toHexDump(firstContentString));
+                System.out.printf("Second content string was \"%s\", should be \"%s\"\n", secondContentString, correctSecondString);
+                System.out.printf("Second content string hex: \"%s\"\n", toHexDump(secondContentString));
+                System.out.println("========================");
                 System.exit(1);
             }
         } catch (IOException e) {

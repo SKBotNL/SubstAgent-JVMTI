@@ -1,3 +1,5 @@
+#include <alloca.h>
+#include <assert.h>
 #include <errno.h>
 #include <jvmti.h>
 #include <jni.h>
@@ -10,37 +12,34 @@
 
 static jvmtiEnv* jvmti = NULL;
 
-typedef jint (JNICALL *open0_t)(JNIEnv*, jobject, jstring);
+typedef void (JNICALL *open0_t)(JNIEnv*, jobject, jstring);
 typedef jint (JNICALL *readBytes_t)(JNIEnv*, jobject, jbyteArray, jint, jint);
-static volatile readBytes_t real_readBytes = NULL;
-static volatile open0_t real_open0 = NULL;
+typedef jint (JNICALL *read0_t)(JNIEnv*, jobject);
+typedef jlong (JNICALL *length0_t)(JNIEnv*, jobject);
+typedef jlong (JNICALL *position0_t)(JNIEnv*, jobject);
+typedef jlong (JNICALL *skip0_t)(JNIEnv*, jobject, jlong);
+typedef jint (JNICALL *available0_t)(JNIEnv*, jobject);
+typedef void (JNICALL *close_t)(JNIEnv*, jobject);
+static readBytes_t real_readBytes = NULL;
+static open0_t real_open0 = NULL;
+static read0_t real_read0 = NULL;
+static length0_t real_length0 = NULL;
+static position0_t real_position0 = NULL;
+static skip0_t real_skip0 = NULL;
+static available0_t real_available0 = NULL;
+static close_t real_close = NULL;
 
-struct file_data{
-    signed char* data;
-    size_t data_len;
-    size_t offset;
+struct file_data {
+    char* data;
+    size_t index;
+    size_t length;
+    int freed;
 };
 
-struct file_entry{
+struct file{
     jint key;
     struct file_data value;
 } *files_map = NULL;
-
-// Check return value for .data == NULL
-struct file_data make_file_data(const signed char* data, size_t len, size_t offset) {
-    struct file_data fd;
-
-    fd.data = malloc(len);
-    if (fd.data == NULL) {
-        fd.data_len = 0;
-        return fd;
-    }
-
-    memcpy(fd.data, data, len);
-    fd.data_len = len;
-    fd.offset = offset;
-    return fd;
-}
 
 static const jlong TAG = 1;
 
@@ -61,7 +60,7 @@ static int has_tag(jobject obj) {
 static int is_config_path(const char* path) {
     char* extString = strrchr(path, '.');
     if (extString) {
-        return strcmp(extString, ".yml") == 0 || strcmp(extString, ".yaml") == 0 || strcmp(extString, ".json") == 0 || strcmp(extString, ".txt") == 0;
+        return strcmp(extString, ".yml") == 0 || strcmp(extString, ".yaml") == 0 || strcmp(extString, ".json") == 0 || strcmp(extString, ".txt") == 0 || strcmp(extString, ".properties") == 0;
     }
     return 0;
 }
@@ -102,159 +101,280 @@ static void substitute(const char* value, size_t value_len, int dollar_sign_matc
     memcpy(arr, result, ba_length);
 }
 
+static char* new_substitute(const char* value, int dollar_sign_matched_index, size_t i, size_t env_len, const char *data) {
+    size_t value_len = strlen(value);
+    ssize_t len_diff = value_len - env_len;
+
+    size_t data_len = strlen(data);
+    size_t new_len = data_len+len_diff;
+    char* new_data = malloc(new_len + 1);
+    size_t after_len = new_len - dollar_sign_matched_index - value_len;
+    memcpy(new_data, data, dollar_sign_matched_index);
+    memcpy(new_data+dollar_sign_matched_index, value, value_len);
+    memcpy(new_data+dollar_sign_matched_index+value_len, data+i, after_len);
+    assert(dollar_sign_matched_index+value_len+after_len == new_len);
+    new_data[new_len] = '\0';
+    return new_data;
+}
+
 static jint JNICALL readBytes_hook(JNIEnv* env, jobject thiz, jbyteArray buf, jint off, jint len) {
+    if (!has_tag(thiz)) {
+        return real_readBytes(env, thiz, buf, off, len);
+    }
+
     jclass class = (*env)->GetObjectClass(env, thiz);
     jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
-    struct file_entry *fe = hmgetp(files_map, hash);
 
-    jint r = real_readBytes(env, thiz, buf, off, len);
-    if (!has_tag(thiz)) {
-        return r;
+    struct file *file = hmgetp(files_map, hash);
+    if (file->key != hash || file->value.freed) {
+        return -1;
     }
 
-    jmethodID length_method_id = (*env)->GetMethodID(env, class, "length", "()J");
-    jlong length = (*env)->CallLongMethod(env, thiz, length_method_id);
-
-    jmethodID position_method_id = (*env)->GetMethodID(env, class, "position", "()J");
-    jlong position = (*env)->CallLongMethod(env, thiz, position_method_id);
-
-    int last_data = length - position == 0;
-
+    struct file_data *fd = &file->value;
     jsize ba_length = (*env)->GetArrayLength(env, buf);
     jbyte *ba = (*env)->GetByteArrayElements(env, buf, JNI_FALSE);
 
-    if (r == -1) {
-        if (fe && fe->key != hash) {
-            (*env)->ReleaseByteArrayElements(env, buf, ba, 0);
-            return -1;
-        } else {
-            struct file_data fd = fe->value;
-            size_t writeDataLen = MIN(fd.data_len, ba_length);
-            memcpy(ba, fd.data, writeDataLen);
-            if (ba_length < fd.data_len) {
-                signed char data[fd.data_len - ba_length];
-                memcpy(data, fd.data+ba_length, fd.data_len - ba_length);
-                struct file_data new_fd = make_file_data(data, fd.data_len-ba_length, 0);
-                if (new_fd.data == NULL) {
-                    fprintf(stderr, "\e[0;31m[SubstAgent] Malloc failed\e[0m\n");
-                    exit(EXIT_FAILURE);
-                }
-                hmput(files_map, hash, fd);
-            }
-            (*env)->ReleaseByteArrayElements(env, buf, ba, 0);
-            return writeDataLen;
-        }
+    size_t remaining = fd->length - fd->index;
+
+    jsize len_want_to_read = MIN((ba_length - off), len);
+    jsize len_to_read = MIN(len_want_to_read, (jsize)remaining);
+    if (len_to_read < 0) {
+        (*env)->ReleaseByteArrayElements(env, buf, ba, 0);
+        return -1;
+    }
+    memcpy(ba + off, fd->data + fd->index, len_to_read);
+
+    (*env)->ReleaseByteArrayElements(env, buf, ba, 0);
+
+    fd->index += len_to_read;
+    if (fd->index == fd->length) {
+        free(fd->data);
+        fd->freed = 1;
+    }
+    return len_to_read;
+}
+
+static void JNICALL open0_hook(JNIEnv* env, jobject thiz, jstring jpath) {
+    if (has_tag(thiz)) {
+        return;
     }
 
-    jsize used_bytes = r;
-    if (ba) {
-        signed char* arr = malloc(ba_length);
-        signed char* exceeded = malloc(0);
-        size_t exceeded_len = 0;
+    const char* path = (*env)->GetStringUTFChars(env, jpath, NULL);
+    if (!path || !is_config_path(path)) {
+        real_open0(env, thiz, jpath);
+        return;
+    }
+    tag(thiz);
 
-        if (fe->key == hash) {
-            struct file_data fd = fe->value;
-            ssize_t orig_fitting_data_len = ba_length - fd.data_len;
-            if (orig_fitting_data_len > 0) {
-                memcpy(arr+fd.data_len, ba, orig_fitting_data_len);
-            }
-            size_t dataLen = MIN(fd.data_len, ba_length);
-            ssize_t offset = 0;
-            if (off != 0) {
-                offset = fd.offset - off;
-            }
-            for (ssize_t i = offset; i < dataLen; i++) {
-                if (i < 0) continue;
-                arr[i] = fd.data[i];
-            }
-            
-            ssize_t free_bytes = ba_length - used_bytes;
-            size_t already_copied_bytes = 0;
-            if (free_bytes > 0) {
-                already_copied_bytes = MIN(fd.data_len, free_bytes);
-                used_bytes += already_copied_bytes;
-            }
+    jclass class = (*env)->GetObjectClass(env, thiz);
+    jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
+    jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-            size_t left_over_exceeded = MAX((ssize_t)fd.data_len - (ssize_t)ba_length, 0);
-            exceeded = realloc(exceeded, left_over_exceeded + fd.data_len - left_over_exceeded);
-            memcpy(exceeded, fd.data+fd.data_len-left_over_exceeded, left_over_exceeded);
-            memcpy(exceeded+left_over_exceeded, ba+(ba_length-fd.data_len)+left_over_exceeded, fd.data_len-left_over_exceeded);
-            exceeded_len = left_over_exceeded + fd.data_len - left_over_exceeded;
-        } else {
-            memcpy(arr, ba, ba_length);
-        }
+    FILE *file = fopen(path, "rb");
+    if (!file) {
+        jclass fileNotFoundException = (*env)->FindClass(env, "java/io/FileNotFoundException");
+        (*env)->ThrowNew(env, fileNotFoundException, path);
+        return;
+    }
+    fseek(file, 0, SEEK_END);
+    size_t fsize = ftell(file);
+    if (fsize == 0) {
+        real_open0(env, thiz, jpath);
+        return;
+    }
+    fseek(file, 0, SEEK_SET);
 
-        int dollar_sign_matched_index = -1;
-        char env_var[4096];
-        env_var[0] = '\0';
-        for (size_t i = 0; i < len; i++) {
-            unsigned char c = arr[i];
-            if (dollar_sign_matched_index != -1) {
-                if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95) {
-                    size_t len = strlen(env_var);
-                    env_var[len] = c;
-                    env_var[len + 1] = '\0';
-                } else {
-                    if (strlen(env_var) == 0) continue;
-                    char* value = getenv(env_var);
-                    if (!value) {
-                        dollar_sign_matched_index = -1;
-                        env_var[0] = '\0';
-                        continue;
-                    }
+    char *file_data = malloc(fsize + 1);
+    fread(file_data, fsize, 1, file);
+    file_data[fsize] = '\0';
 
-                    size_t env_len = i - dollar_sign_matched_index;
-                    size_t value_len = strlen(value);
-                    ssize_t len_diff = value_len - env_len;
-
-                    substitute(value, value_len, dollar_sign_matched_index, i, len_diff, ba_length, arr, &used_bytes, exceeded, &exceeded_len);
-
+    int dollar_sign_matched_index = -1;
+    char env_var[4096];
+    env_var[0] = '\0';
+    for (size_t i = 0; i < fsize; i++) {
+        char c = file_data[i];
+        if (dollar_sign_matched_index != -1) {
+            if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95) {
+                size_t len = strlen(env_var);
+                env_var[len] = c;
+                env_var[len + 1] = '\0';
+            } else {
+                if (strlen(env_var) == 0) continue;
+                char* value = getenv(env_var);
+                if (!value) {
                     dollar_sign_matched_index = -1;
                     env_var[0] = '\0';
                     continue;
                 }
-            } else {
-                if (c == '$') {
-                    dollar_sign_matched_index = i;
-                }
-            }
-        }
-        if (last_data && dollar_sign_matched_index != -1) {
-            if (strlen(env_var) != 0) {
-                char* value = getenv(env_var);
-                if (value) {
-                    size_t env_len = len - dollar_sign_matched_index;
-                    size_t value_len = strlen(value);
-                    ssize_t len_diff = value_len - env_len;
 
-                    substitute(value, value_len, dollar_sign_matched_index, len, len_diff, ba_length, arr, &used_bytes, exceeded, &exceeded_len);
-                }
+                size_t env_len = i - dollar_sign_matched_index;
+
+                char* new_data = new_substitute(value, dollar_sign_matched_index, i, env_len, file_data);
+                free(file_data);
+                file_data = new_data;
+
+                dollar_sign_matched_index = -1;
+                env_var[0] = '\0';
+                continue;
+            }
+        } else {
+            if (c == '$') {
+                dollar_sign_matched_index = i;
             }
         }
-        if (exceeded_len > 0) {
-            struct file_data fd = make_file_data(exceeded, exceeded_len, ba_length);
-            hmput(files_map, hash, fd);
-        }
-        memcpy(ba, arr, ba_length);
     }
-    (*env)->ReleaseByteArrayElements(env, buf, ba, 0);
-    return used_bytes;
+    if (dollar_sign_matched_index != -1) {
+        if (strlen(env_var) != 0) {
+            char* value = getenv(env_var);
+            if (value) {
+                size_t env_len = fsize - dollar_sign_matched_index;
+
+                char* new_data = new_substitute(value, dollar_sign_matched_index, fsize, env_len, file_data);
+                free(file_data);
+                file_data = new_data;
+            }
+        }
+    }
+
+    size_t fd_len = strlen(file_data);
+
+    struct file_data fd;
+    fd.data = file_data;
+    fd.length = fd_len;
+    fd.index = 0;
+    fd.freed = 0;
+    hmput(files_map, hash, fd);
+    (*env)->ReleaseStringUTFChars(env, jpath, path);
 }
 
-static void open0_hook(JNIEnv* env, jobject thiz, jstring jpath) {
-    if (!jpath) {
+static jint JNICALL read0_hook(JNIEnv* env, jobject thiz) {
+    if (!has_tag(thiz)) {
+        return real_read0(env, thiz);
+    }
+
+    jclass class = (*env)->GetObjectClass(env, thiz);
+    jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
+
+    jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
+
+    struct file *file = hmgetp(files_map, hash);
+    if (file->key != hash || file->value.freed) {
+        return -1;
+    }
+
+    struct file_data *fd = &file->value;
+    char read_byte = fd->data[fd->index++];
+    if (fd->data[fd->index] == '\0') {
+        free(fd->data);
+        fd->freed = 1;
+    }
+    return read_byte;
+}
+
+static jlong JNICALL length0_hook(JNIEnv* env, jobject thiz) {
+    if (!has_tag(thiz)) {
+        return real_length0(env, thiz);
+    }
+
+    jclass class = (*env)->GetObjectClass(env, thiz);
+    jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
+
+    jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
+
+    struct file *file = hmgetp(files_map, hash);
+    if (file->key != hash) {
+        return -1;
+    }
+
+    return file->value.length;
+}
+
+static jlong JNICALL position0_hook(JNIEnv* env, jobject thiz) {
+    if (!has_tag(thiz)) {
+        return real_length0(env, thiz);
+    }
+
+    jclass class = (*env)->GetObjectClass(env, thiz);
+    jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
+
+    jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
+
+    struct file *file = hmgetp(files_map, hash);
+    if (file->key != hash) {
+        return -1;
+    }
+
+    return file->value.index;
+}
+
+static jlong JNICALL skip0_hook(JNIEnv* env, jobject thiz, jlong n) {
+    if (!has_tag(thiz)) {
+        return real_skip0(env, thiz, n);
+    }
+
+    jclass class = (*env)->GetObjectClass(env, thiz);
+    jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
+
+    jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
+
+    struct file *file = hmgetp(files_map, hash);
+    if (file->key != hash) {
+        return 0;
+    }
+
+    struct file_data *fd = &file->value;
+
+    size_t remaining = fd->length - fd->index;
+    size_t skip = MIN(remaining, n);
+    fd->index += skip;
+    if (skip == remaining) {
+        free(fd->data);
+        fd->freed = 1;
+        return skip;
+    }
+
+    return skip;
+}
+
+static jint JNICALL available0_hook(JNIEnv* env, jobject thiz) {
+    if (!has_tag(thiz)) {
+        return real_available0(env, thiz);
+    }
+
+    jclass class = (*env)->GetObjectClass(env, thiz);
+    jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
+
+    jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
+
+    struct file *file = hmgetp(files_map, hash);
+    if (file->key != hash) {
+        return 0;
+    }
+
+    struct file_data *fd = &file->value;
+    return fd->length - fd->index;
+}
+
+static void JNICALL close_hook(JNIEnv* env, jobject thiz) {
+    if (!has_tag(thiz)) {
+        return real_close(env, thiz);
+    }
+
+    jclass class = (*env)->GetObjectClass(env, thiz);
+    jmethodID hash_code_method = (*env)->GetMethodID(env, class, "hashCode", "()I");
+
+    jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
+
+    struct file *file = hmgetp(files_map, hash);
+    if (file->key != hash) {
         return;
     }
-    const char* path = (*env)->GetStringUTFChars(env, jpath, NULL);
-    if (path) {
-        if (is_config_path(path)) {
-            tag(thiz);
-        }
-        (*env)->ReleaseStringUTFChars(env, jpath, path);
-    }
-    real_open0(env, thiz, jpath);
+
+    free(file->value.data);
+    file->value.freed = 1;
+    return;
 }
 
 static void dealloc(jvmtiEnv* jvmti, char* p) {
@@ -276,12 +396,38 @@ static void JNICALL onNativeMethodBind(jvmtiEnv* jvmti_env, JNIEnv* env, jthread
     (*jvmti_env)->GetMethodName(jvmti_env, method, &mname, &msig, NULL);
 
     if (csig && strcmp(csig, "Ljava/io/FileInputStream;") == 0 && mname && msig) {
+        // private native void open0(String name)
         if (strcmp(mname, "open0") == 0 && strcmp(msig, "(Ljava/lang/String;)V") == 0) {
             real_open0 = (open0_t)address;
             *new_address_ptr = (void*)&open0_hook;
+        // private native int readBytes(byte b[], int off, int len)
         } else if (strcmp(mname, "readBytes") == 0 && strcmp(msig, "([BII)I") == 0) {
             real_readBytes = (readBytes_t)address;
             *new_address_ptr = (void*)&readBytes_hook;
+        // private native int read0
+        } else if (strcmp(mname, "read0") == 0 && strcmp(msig, "()I") == 0) {
+            real_read0 = (read0_t)address;
+            *new_address_ptr = (void*)&read0_hook;
+        // private native long length0()
+        } else if (strcmp(mname, "length0") == 0 && strcmp(msig, "()J") == 0) {
+            real_length0 = (length0_t)address;
+            *new_address_ptr = (void*)&length0_hook;
+        // private native long position0()
+        } else if (strcmp(mname, "position0") == 0 && strcmp(msig, "()J") == 0) {
+            real_position0 = (position0_t)address;
+            *new_address_ptr = (void*)&position0_hook;
+        // private native long skip0(long n)
+        } else if (strcmp(mname, "skip0") == 0 && strcmp(msig, "(J)J") == 0) {
+            real_skip0 = (skip0_t)address;
+            *new_address_ptr = (void*)&skip0_hook;
+        // private native int available0()
+        } else if (strcmp(mname, "available0") == 0 && strcmp(msig, "()I") == 0) {
+            real_available0 = (available0_t)address;
+            *new_address_ptr = (void*)&available0_hook;
+        // public void close()
+        } else if (strcmp(mname, "close") == 0 && strcmp(msig, "()V") == 0) {
+            real_close = (close_t)address;
+            *new_address_ptr = (void*)&close_hook;
         }
     }
 
@@ -316,6 +462,9 @@ static jint init_jvmti(JavaVM* vm) {
         while ((n = getline(&line, &len, env_file)) != -1) {
             if (n > 0 && line[n - 1] == '\n') {
                 line[n - 1] = '\0';
+            }
+            if (line[0] == '#') {
+                continue;
             }
             char *name = line;
             char *value = NULL;

@@ -4,8 +4,8 @@ import java.util.Arrays;
 
 // Test $LONGER_ENV split in 2 byte arrays, only the read content overflows
 class Test6 {
-    static String correctFirstString = "Hi abcdef ";
-    static String correctSecondString = "According to all known laws of aviation, there is no way a bee should be able to fly";
+    static String correctFirstString = "Hi abcdef Accor";
+    static String correctSecondString = "ding to all known laws of aviation, there is no way a bee should be able to fly";
 
     public static String toHexDump(String s) {
         byte[] bytes = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
