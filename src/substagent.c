@@ -478,6 +478,7 @@ static jint init_jvmti(JavaVM* vm) {
             if (setenv(name, value, 0) != 0) {
                 perror("setenv failed");
             }
+            free(line);
         }
     } else {
         if (errno != ENOENT) {
@@ -485,6 +486,7 @@ static jint init_jvmti(JavaVM* vm) {
             exit(EXIT_FAILURE);
         }
     }
+    fclose(env_file);
 
     fprintf(stderr, "[SubstAgent] Loaded version %s\n", GIT_HASH);
 
