@@ -478,8 +478,8 @@ static jint init_jvmti(JavaVM* vm) {
             if (setenv(name, value, 0) != 0) {
                 perror("setenv failed");
             }
-            free(line);
         }
+        free(line);
     } else {
         if (errno != ENOENT) {
             perror("[SubstAgent] fopen failed");
