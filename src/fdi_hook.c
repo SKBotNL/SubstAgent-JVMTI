@@ -2,9 +2,12 @@
 #include "stb_ds.h"
 #include "utils.h"
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 und_open0_t und_real_open0 = NULL;
+und_close0_t und_real_close0 = NULL;
 
 fdi_read0_t fdi_real_read0 = NULL;
 
@@ -36,6 +39,7 @@ jint JNICALL und_open0_hook(JNIEnv *env, jobject thiz, jlong path_address, jint 
 
     char *data = malloc(fsize + 1);
     fread(data, fsize, 1, file);
+    fclose(file);
     data[fsize] = '\0';
 
     parse_file(&data, fsize);
@@ -52,13 +56,21 @@ jint JNICALL und_open0_hook(JNIEnv *env, jobject thiz, jlong path_address, jint 
     return fd;
 }
 
+void JNICALL und_close0_hook(JNIEnv* env, jobject thiz, jint fd) {
+    struct file *file = hmgetp_null(fdi_files_map, fd);
+    if (file != NULL) {
+        free(file->value.data);
+        hmdel(fdi_files_map, fd);
+    }
+}
+
 jint JNICALL fdi_read0_hook(JNIEnv *env, jobject thiz, jobject fdObject, jlong address, jint len) {
     jclass class = (*env)->GetObjectClass(env, fdObject);
     jfieldID fieldID = (*env)->GetFieldID(env, class, "fd", "I");
     jint fd = (*env)->GetIntField(env, fdObject, fieldID);
 
-    struct file *file = hmgetp(fdi_files_map, fd);
-    if (file->key != fd) {
+    struct file *file = hmgetp_null(fdi_files_map, fd);
+    if (file == NULL) {
         return fdi_real_read0(env, thiz, fdObject, address, len);
     } else if (file->value.freed) {
         return -1;

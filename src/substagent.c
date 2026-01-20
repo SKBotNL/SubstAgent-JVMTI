@@ -62,6 +62,10 @@ static void JNICALL onNativeMethodBind(jvmtiEnv* jvmti_env, JNIEnv* env, jthread
             if (strcmp(mname, "open0") == 0 && strcmp(msig, "(JII)I") == 0) {
                 und_real_open0 = (und_open0_t)address;
                 *new_address_ptr = (void*)&und_open0_hook;
+            // private static native void close0(int fd)
+            } else if (strcmp(mname, "close0") == 0 && strcmp(msig, "(I)V") == 0) {
+                und_real_close0 = (und_close0_t)address;
+                *new_address_ptr = (void*)&und_close0_hook;
             }
         } else if (strcmp(csig, "Lsun/nio/ch/FileDispatcherImpl;") == 0) {
             // static native int read0(FileDescriptor fd, long address, int len)

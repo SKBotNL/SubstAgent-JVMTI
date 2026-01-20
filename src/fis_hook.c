@@ -88,6 +88,7 @@ void JNICALL fis_open0_hook(JNIEnv* env, jobject thiz, jstring jpath) {
 
     char *data = malloc(fsize + 1);
     fread(data, fsize, 1, file);
+    fclose(file);
     data[fsize] = '\0';
 
     parse_file(&data, fsize);
