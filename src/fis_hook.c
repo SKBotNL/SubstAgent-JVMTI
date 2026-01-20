@@ -27,8 +27,8 @@ jint JNICALL fis_readBytes_hook(JNIEnv* env, jobject thiz, jbyteArray buf, jint 
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(fis_files_map, hash);
-    if (file->key != hash || file->value.freed) {
+    struct file *file = hmgetp_null(fis_files_map, hash);
+    if (file == NULL || file->value.freed) {
         return -1;
     }
 
@@ -114,8 +114,8 @@ jint JNICALL fis_read0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(fis_files_map, hash);
-    if (file->key != hash || file->value.freed) {
+    struct file *file = hmgetp_null(fis_files_map, hash);
+    if (file == NULL || file->value.freed) {
         return -1;
     }
 
@@ -138,8 +138,8 @@ jlong JNICALL fis_length0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(fis_files_map, hash);
-    if (file->key != hash) {
+    struct file *file = hmgetp_null(fis_files_map, hash);
+    if (file == NULL) {
         return -1;
     }
 
@@ -156,8 +156,8 @@ jlong JNICALL fis_position0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(fis_files_map, hash);
-    if (file->key != hash) {
+    struct file *file = hmgetp_null(fis_files_map, hash);
+    if (file == NULL) {
         return -1;
     }
 
@@ -174,8 +174,8 @@ jlong JNICALL fis_skip0_hook(JNIEnv* env, jobject thiz, jlong n) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(fis_files_map, hash);
-    if (file->key != hash) {
+    struct file *file = hmgetp_null(fis_files_map, hash);
+    if (file == NULL) {
         return 0;
     }
 
@@ -203,8 +203,8 @@ jint JNICALL fis_available0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(fis_files_map, hash);
-    if (file->key != hash) {
+    struct file *file = hmgetp_null(fis_files_map, hash);
+    if (file == NULL) {
         return 0;
     }
 
@@ -222,8 +222,8 @@ void JNICALL fis_close_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(fis_files_map, hash);
-    if (file->key != hash) {
+    struct file *file = hmgetp_null(fis_files_map, hash);
+    if (file == NULL) {
         return;
     }
 

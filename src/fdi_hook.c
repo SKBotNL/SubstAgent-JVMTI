@@ -72,7 +72,8 @@ jint JNICALL fdi_read0_hook(JNIEnv *env, jobject thiz, jobject fdObject, jlong a
     struct file *file = hmgetp_null(fdi_files_map, fd);
     if (file == NULL) {
         return fdi_real_read0(env, thiz, fdObject, address, len);
-    } else if (file->value.freed) {
+    }
+    if (file->value.freed) {
         return -1;
     }
 
