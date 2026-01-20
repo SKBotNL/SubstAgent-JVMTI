@@ -2,7 +2,6 @@
 #define FIS_HOOK_H
 
 #include <jvmti.h>
-#include <jni.h>
 
 typedef void (JNICALL *fis_open0_t)(JNIEnv*, jobject, jstring);
 typedef jint (JNICALL *fis_readBytes_t)(JNIEnv*, jobject, jbyteArray, jint, jint);

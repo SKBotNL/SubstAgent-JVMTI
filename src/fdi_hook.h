@@ -2,7 +2,6 @@
 #define FDI_HOOK_H
 
 #include <jvmti.h>
-#include <jni.h>
 
 typedef jint (JNICALL *und_open0_t)(JNIEnv*, jobject, jlong, jint, jint);
 extern und_open0_t und_real_open0;

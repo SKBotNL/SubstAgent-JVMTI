@@ -2,9 +2,6 @@
 #include "stb_ds.h"
 #include "utils.h"
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 und_open0_t und_real_open0 = NULL;
 und_close0_t und_real_close0 = NULL;

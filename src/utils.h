@@ -2,7 +2,6 @@
 #define UTILS_H
 
 #include <jvmti.h>
-#include <jni.h>
 
 extern jvmtiEnv* jvmti;
 

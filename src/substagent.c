@@ -1,11 +1,6 @@
-#include <alloca.h>
-#include <assert.h>
 #include <errno.h>
-#include <jvmti.h>
-#include <jni.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include "build_info.h"
 #include "fdi_hook.h"
 #include "fis_hook.h"
