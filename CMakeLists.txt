@@ -14,7 +14,7 @@ add_custom_target(build_info ALL
 
 find_package(JNI REQUIRED)
 
-add_library(substagent SHARED src/substagent.c src/fis_hook.c src/utils.c)
+add_library(substagent SHARED src/substagent.c src/fis_hook.c src/fdi_hook.c src/utils.c)
 add_library(stb INTERFACE)
 
 target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/external/stb)

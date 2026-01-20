@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "build_info.h"
+#include "fdi_hook.h"
 #include "fis_hook.h"
 #include "utils.h"
 
@@ -25,36 +26,48 @@ static void JNICALL onNativeMethodBind(jvmtiEnv* jvmti_env, JNIEnv* env, jthread
         if (strcmp(csig, "Ljava/io/FileInputStream;") == 0) {
             // private native void open0(String name)
             if (strcmp(mname, "open0") == 0 && strcmp(msig, "(Ljava/lang/String;)V") == 0) {
-                fis_real_open0 = (open0_t)address;
+                fis_real_open0 = (fis_open0_t)address;
                 *new_address_ptr = (void*)&fis_open0_hook;
             // private native int readBytes(byte b[], int off, int len)
             } else if (strcmp(mname, "readBytes") == 0 && strcmp(msig, "([BII)I") == 0) {
-                fis_real_readBytes = (readBytes_t)address;
+                fis_real_readBytes = (fis_readBytes_t)address;
                 *new_address_ptr = (void*)&fis_readBytes_hook;
             // private native int read0
             } else if (strcmp(mname, "read0") == 0 && strcmp(msig, "()I") == 0) {
-                fis_real_read0 = (read0_t)address;
+                fis_real_read0 = (fis_read0_t)address;
                 *new_address_ptr = (void*)&fis_read0_hook;
             // private native long length0()
             } else if (strcmp(mname, "length0") == 0 && strcmp(msig, "()J") == 0) {
-                fis_real_length0 = (length0_t)address;
+                fis_real_length0 = (fis_length0_t)address;
                 *new_address_ptr = (void*)&fis_length0_hook;
             // private native long position0()
             } else if (strcmp(mname, "position0") == 0 && strcmp(msig, "()J") == 0) {
-                fis_real_position0 = (position0_t)address;
+                fis_real_position0 = (fis_position0_t)address;
                 *new_address_ptr = (void*)&fis_position0_hook;
             // private native long skip0(long n)
             } else if (strcmp(mname, "skip0") == 0 && strcmp(msig, "(J)J") == 0) {
-                fis_real_skip0 = (skip0_t)address;
+                fis_real_skip0 = (fis_skip0_t)address;
                 *new_address_ptr = (void*)&fis_skip0_hook;
             // private native int available0()
             } else if (strcmp(mname, "available0") == 0 && strcmp(msig, "()I") == 0) {
-                fis_real_available0 = (available0_t)address;
+                fis_real_available0 = (fis_available0_t)address;
                 *new_address_ptr = (void*)&fis_available0_hook;
             // public void close()
             } else if (strcmp(mname, "close") == 0 && strcmp(msig, "()V") == 0) {
-                fis_real_close = (close_t)address;
+                fis_real_close = (fis_close_t)address;
                 *new_address_ptr = (void*)&fis_close_hook;
+            }
+        } else if (strcmp(csig, "Lsun/nio/fs/UnixNativeDispatcher;") == 0) {
+            // private static native int open0(long pathAddress, int flags, int mode)
+            if (strcmp(mname, "open0") == 0 && strcmp(msig, "(JII)I") == 0) {
+                und_real_open0 = (und_open0_t)address;
+                *new_address_ptr = (void*)&und_open0_hook;
+            }
+        } else if (strcmp(csig, "Lsun/nio/ch/FileDispatcherImpl;") == 0) {
+            // static native int read0(FileDescriptor fd, long address, int len)
+            if (strcmp(mname, "read0") == 0 && strcmp(msig, "(Ljava/io/FileDescriptor;JI)I") == 0) {
+                fdi_real_read0 = (fdi_read0_t)address;
+                *new_address_ptr = (void*)&fdi_read0_hook;
             }
         }
     }

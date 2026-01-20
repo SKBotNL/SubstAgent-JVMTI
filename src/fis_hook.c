@@ -3,19 +3,19 @@
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
 
-readBytes_t fis_real_readBytes = NULL;
-open0_t fis_real_open0 = NULL;
-read0_t fis_real_read0 = NULL;
-length0_t fis_real_length0 = NULL;
-position0_t fis_real_position0 = NULL;
-skip0_t fis_real_skip0 = NULL;
-available0_t fis_real_available0 = NULL;
-close_t fis_real_close = NULL;
+fis_readBytes_t fis_real_readBytes = NULL;
+fis_open0_t fis_real_open0 = NULL;
+fis_read0_t fis_real_read0 = NULL;
+fis_length0_t fis_real_length0 = NULL;
+fis_position0_t fis_real_position0 = NULL;
+fis_skip0_t fis_real_skip0 = NULL;
+fis_available0_t fis_real_available0 = NULL;
+fis_close_t fis_real_close = NULL;
 
 struct file{
     jint key;
     struct file_data value;
-} *files_map = NULL;
+} *fis_files_map = NULL;
 
 jint JNICALL fis_readBytes_hook(JNIEnv* env, jobject thiz, jbyteArray buf, jint off, jint len) {
     if (!has_tag(thiz)) {
@@ -27,7 +27,7 @@ jint JNICALL fis_readBytes_hook(JNIEnv* env, jobject thiz, jbyteArray buf, jint 
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(files_map, hash);
+    struct file *file = hmgetp(fis_files_map, hash);
     if (file->key != hash || file->value.freed) {
         return -1;
     }
@@ -86,66 +86,20 @@ void JNICALL fis_open0_hook(JNIEnv* env, jobject thiz, jstring jpath) {
     }
     fseek(file, 0, SEEK_SET);
 
-    char *file_data = malloc(fsize + 1);
-    fread(file_data, fsize, 1, file);
-    file_data[fsize] = '\0';
+    char *data = malloc(fsize + 1);
+    fread(data, fsize, 1, file);
+    data[fsize] = '\0';
 
-    int dollar_sign_matched_index = -1;
-    char env_var[4096];
-    env_var[0] = '\0';
-    for (size_t i = 0; i < fsize; i++) {
-        char c = file_data[i];
-        if (dollar_sign_matched_index != -1) {
-            if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95) {
-                size_t len = strlen(env_var);
-                env_var[len] = c;
-                env_var[len + 1] = '\0';
-            } else {
-                if (strlen(env_var) == 0) continue;
-                char* value = getenv(env_var);
-                if (!value) {
-                    dollar_sign_matched_index = -1;
-                    env_var[0] = '\0';
-                    continue;
-                }
+    parse_file(&data, fsize);
 
-                size_t env_len = i - dollar_sign_matched_index;
+    size_t fd_len = strlen(data);
 
-                char* new_data = substitute(value, dollar_sign_matched_index, i, env_len, file_data);
-                free(file_data);
-                file_data = new_data;
-
-                dollar_sign_matched_index = -1;
-                env_var[0] = '\0';
-                continue;
-            }
-        } else {
-            if (c == '$') {
-                dollar_sign_matched_index = i;
-            }
-        }
-    }
-    if (dollar_sign_matched_index != -1) {
-        if (strlen(env_var) != 0) {
-            char* value = getenv(env_var);
-            if (value) {
-                size_t env_len = fsize - dollar_sign_matched_index;
-
-                char* new_data = substitute(value, dollar_sign_matched_index, fsize, env_len, file_data);
-                free(file_data);
-                file_data = new_data;
-            }
-        }
-    }
-
-    size_t fd_len = strlen(file_data);
-
-    struct file_data fd;
-    fd.data = file_data;
-    fd.length = fd_len;
-    fd.index = 0;
-    fd.freed = 0;
-    hmput(files_map, hash, fd);
+    struct file_data file_data;
+    file_data.data = data;
+    file_data.length = fd_len;
+    file_data.index = 0;
+    file_data.freed = 0;
+    hmput(fis_files_map, hash, file_data);
     (*env)->ReleaseStringUTFChars(env, jpath, path);
 }
 
@@ -159,7 +113,7 @@ jint JNICALL fis_read0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(files_map, hash);
+    struct file *file = hmgetp(fis_files_map, hash);
     if (file->key != hash || file->value.freed) {
         return -1;
     }
@@ -183,7 +137,7 @@ jlong JNICALL fis_length0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(files_map, hash);
+    struct file *file = hmgetp(fis_files_map, hash);
     if (file->key != hash) {
         return -1;
     }
@@ -201,7 +155,7 @@ jlong JNICALL fis_position0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(files_map, hash);
+    struct file *file = hmgetp(fis_files_map, hash);
     if (file->key != hash) {
         return -1;
     }
@@ -219,7 +173,7 @@ jlong JNICALL fis_skip0_hook(JNIEnv* env, jobject thiz, jlong n) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(files_map, hash);
+    struct file *file = hmgetp(fis_files_map, hash);
     if (file->key != hash) {
         return 0;
     }
@@ -248,7 +202,7 @@ jint JNICALL fis_available0_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(files_map, hash);
+    struct file *file = hmgetp(fis_files_map, hash);
     if (file->key != hash) {
         return 0;
     }
@@ -267,7 +221,7 @@ void JNICALL fis_close_hook(JNIEnv* env, jobject thiz) {
 
     jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
-    struct file *file = hmgetp(files_map, hash);
+    struct file *file = hmgetp(fis_files_map, hash);
     if (file->key != hash) {
         return;
     }

@@ -43,3 +43,56 @@ char* substitute(const char* value, int dollar_sign_matched_index, size_t i, siz
     new_data[new_len] = '\0';
     return new_data;
 }
+
+void parse_file(char **data_ptr, size_t fsize) {
+    char *data = *data_ptr;
+    int dollar_sign_matched_index = -1;
+    char env_var[4096];
+    env_var[0] = '\0';
+    for (size_t i = 0; i < fsize; i++) {
+        char c = data[i];
+        if (dollar_sign_matched_index != -1) {
+            if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95) {
+                size_t len = strlen(env_var);
+                env_var[len] = c;
+                env_var[len + 1] = '\0';
+            } else {
+                if (strlen(env_var) == 0) continue;
+                char* value = getenv(env_var);
+                if (!value) {
+                    dollar_sign_matched_index = -1;
+                    env_var[0] = '\0';
+                    continue;
+                }
+
+                size_t env_len = i - dollar_sign_matched_index;
+
+                char* new_data = substitute(value, dollar_sign_matched_index, i, env_len, data);
+                free(data);
+                data = new_data;
+                *data_ptr = new_data;
+
+                dollar_sign_matched_index = -1;
+                env_var[0] = '\0';
+                continue;
+            }
+        } else {
+            if (c == '$') {
+                dollar_sign_matched_index = i;
+            }
+        }
+    }
+    if (dollar_sign_matched_index != -1) {
+        if (strlen(env_var) != 0) {
+            char* value = getenv(env_var);
+            if (value) {
+                size_t env_len = fsize - dollar_sign_matched_index;
+
+                char* new_data = substitute(value, dollar_sign_matched_index, fsize, env_len, data);
+                free(data);
+                data = new_data;
+                *data_ptr = new_data;
+            }
+        }
+    }
+}
