@@ -116,7 +116,7 @@ static jint init_jvmti(JavaVM* vm) {
             *equal = '\0';
             value = equal + 1;
             if (setenv(name, value, 0) != 0) {
-                perror("setenv failed");
+                perror("[SubstAgent] setenv failed");
             }
         }
         free(line);
