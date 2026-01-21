@@ -73,6 +73,7 @@ void JNICALL und_close0_hook(JNIEnv* env, jobject thiz, jint fd) {
     struct file *file = hmgetp_null(fdi_files_map, fd);
     if (file != NULL) {
         free(file->value.data);
+        file->value.data = NULL;
         hmdel(fdi_files_map, fd);
     }
 }
@@ -104,11 +105,19 @@ jint JNICALL fdi_read0_hook(JNIEnv *env, jobject thiz, jobject fdObject, jlong a
         return -1;
     }
 
+    if (file_data->length == 0) {
+        free(file_data->data);
+        file_data->data = NULL;
+        file_data->freed = 1;
+        return -1;
+    }
+
     int n = MIN(len, file_data->length - file_data->index);
     memcpy((void *)(intptr_t)address, file_data->data + file_data->index, n);
 
     if (n == file_data->length - file_data->index) {
         free(file_data->data);
+        file_data->data = NULL;
         file_data->freed = 1;
     } else {
         file_data->index += n;

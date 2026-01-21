@@ -60,8 +60,10 @@ jint JNICALL fis_readBytes_hook(JNIEnv* env, jobject thiz, jbyteArray buf, jint 
     fd->index += len_to_read;
     if (fd->index == fd->length) {
         free(fd->data);
+        fd->data = NULL;
         fd->freed = 1;
     }
+
     return len_to_read;
 }
 
@@ -96,6 +98,10 @@ void JNICALL fis_open0_hook(JNIEnv* env, jobject thiz, jstring jpath) {
         return;
     }
     size_t fsize = st.st_size;
+    if (fsize == 0) {
+        fclose(file);
+        return;
+    }
 
     char *data = malloc(fsize + 1);
     fread(data, fsize, 1, file);
@@ -134,6 +140,7 @@ jint JNICALL fis_read0_hook(JNIEnv* env, jobject thiz) {
     char read_byte = fd->data[fd->index++];
     if (fd->data[fd->index] == '\0') {
         free(fd->data);
+        fd->data = NULL;
         fd->freed = 1;
     }
     return read_byte;
@@ -197,6 +204,7 @@ jlong JNICALL fis_skip0_hook(JNIEnv* env, jobject thiz, jlong n) {
     fd->index += skip;
     if (skip == remaining) {
         free(fd->data);
+        fd->data = NULL;
         fd->freed = 1;
         return skip;
     }
@@ -239,6 +247,7 @@ void JNICALL fis_close_hook(JNIEnv* env, jobject thiz) {
     }
 
     free(file->value.data);
+    file->value.data = NULL;
     file->value.freed = 1;
     return;
 }
