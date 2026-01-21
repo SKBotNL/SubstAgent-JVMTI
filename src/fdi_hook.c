@@ -2,6 +2,7 @@
 #include "stb_ds.h"
 #include "utils.h"
 #include <stdint.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 
 und_open0_t und_real_open0 = NULL;
@@ -29,6 +30,7 @@ jint JNICALL und_open0_hook(JNIEnv *env, jobject thiz, jlong path_address, jint 
     if (!path || !is_config_path(path)) {
         return fd;
     }
+
     struct stat st;
     if (fstat(fd, &st) != 0) {
         jclass fileNotFoundException =
@@ -36,6 +38,7 @@ jint JNICALL und_open0_hook(JNIEnv *env, jobject thiz, jlong path_address, jint 
         (*env)->ThrowNew(env, fileNotFoundException, path);
         return fd;
     }
+    size_t fsize = st.st_size;
 
     FILE *file = fopen(path, "rb");
     if (!file) {
@@ -44,7 +47,6 @@ jint JNICALL und_open0_hook(JNIEnv *env, jobject thiz, jlong path_address, jint 
         (*env)->ThrowNew(env, fileNotFoundException, path);
         return fd;
     }
-    size_t fsize = st.st_size;
 
     char *data = malloc(fsize + 1);
     fread(data, fsize, 1, file);

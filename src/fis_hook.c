@@ -1,5 +1,7 @@
 #include "fis_hook.h"
 #include "utils.h"
+#include <stdio.h>
+#include <sys/stat.h>
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
 
@@ -85,13 +87,15 @@ void JNICALL fis_open0_hook(JNIEnv* env, jobject thiz, jstring jpath) {
         (*env)->ThrowNew(env, fileNotFoundException, path);
         return;
     }
-    fseek(file, 0, SEEK_END);
-    size_t fsize = ftell(file);
-    if (fsize == 0) {
-        fis_real_open0(env, thiz, jpath);
+
+    struct stat st;
+    if (fstat(fileno(file), &st) != 0) {
+        jclass fileNotFoundException =
+                (*env)->FindClass(env, "java/io/FileNotFoundException");
+        (*env)->ThrowNew(env, fileNotFoundException, path);
         return;
     }
-    fseek(file, 0, SEEK_SET);
+    size_t fsize = st.st_size;
 
     char *data = malloc(fsize + 1);
     fread(data, fsize, 1, file);
