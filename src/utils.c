@@ -57,7 +57,11 @@ void parse_file(char **data_ptr, size_t fsize) {
                 env_var[len] = c;
                 env_var[len + 1] = '\0';
             } else {
-                if (strlen(env_var) == 0) continue;
+                if (strlen(env_var) == 0) {
+                    dollar_sign_matched_index = -1;
+                    env_var[0] = '\0';
+                    continue;
+                }
                 char* value = getenv(env_var);
                 if (!value) {
                     dollar_sign_matched_index = -1;
