@@ -66,7 +66,7 @@ void parse_file(char **data_ptr, size_t fsize, const char* filename) {
                 }
                 char* value = getenv(env_var);
                 if (!value) {
-                    fprintf(stderr, "\e[0;31m[SubstAgent] Failed to expand environment variable \"%s\" in file %s on line %d\e[0m\n", env_var, filename, line_count);
+                    fprintf(stderr, "\033[0G\e[0;31m[SubstAgent] Failed to expand environment variable \"%s\" in file %s on line %d\e[0m\n", env_var, filename, line_count);
                     begin_env_index = -1;
                     env_var[0] = '\0';
                     continue;
@@ -82,11 +82,12 @@ void parse_file(char **data_ptr, size_t fsize, const char* filename) {
                 data = new_data;
                 *data_ptr = new_data;
 
+                fprintf(stderr, "\033[0G[SubstAgent] Successfully expanded environment variable \"%s\" in file %s on line %d\n", env_var, filename, line_count);
                 begin_env_index = -1;
                 env_var[0] = '\0';
                 continue;
             } else {
-                fprintf(stderr, "\e[0;31m[SubstAgent] Invalid environment variable in file %s on line %d\e[0m\n", filename, line_count);
+                fprintf(stderr, "\033[0G\e[0;31m[SubstAgent] Invalid environment variable in file %s on line %d\e[0m\n", filename, line_count);
                 begin_env_index = -1;
                 env_var[0] = '\0';
             }
