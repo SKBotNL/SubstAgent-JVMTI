@@ -12,9 +12,16 @@ fis_skip0_t fis_real_skip0 = NULL;
 fis_available0_t fis_real_available0 = NULL;
 fis_close_t fis_real_close = NULL;
 
+struct fis_file_data {
+    char* data;
+    size_t index;
+    size_t length;
+    int freed;
+};
+
 struct file{
     jint key;
-    struct file_data value;
+    struct fis_file_data value;
 } *fis_files_map = NULL;
 
 jint JNICALL fis_readBytes_hook(JNIEnv* env, jobject thiz, jbyteArray buf, jint off, jint len) {
@@ -32,7 +39,7 @@ jint JNICALL fis_readBytes_hook(JNIEnv* env, jobject thiz, jbyteArray buf, jint 
         return -1;
     }
 
-    struct file_data *fd = &file->value;
+    struct fis_file_data *fd = &file->value;
     jsize ba_length = (*env)->GetArrayLength(env, buf);
     jbyte *ba = (*env)->GetByteArrayElements(env, buf, JNI_FALSE);
 
@@ -95,7 +102,7 @@ void JNICALL fis_open0_hook(JNIEnv* env, jobject thiz, jstring jpath) {
 
     size_t fd_len = strlen(data);
 
-    struct file_data file_data;
+    struct fis_file_data file_data;
     file_data.data = data;
     file_data.length = fd_len;
     file_data.index = 0;
@@ -119,7 +126,7 @@ jint JNICALL fis_read0_hook(JNIEnv* env, jobject thiz) {
         return -1;
     }
 
-    struct file_data *fd = &file->value;
+    struct fis_file_data *fd = &file->value;
     char read_byte = fd->data[fd->index++];
     if (fd->data[fd->index] == '\0') {
         free(fd->data);
@@ -179,7 +186,7 @@ jlong JNICALL fis_skip0_hook(JNIEnv* env, jobject thiz, jlong n) {
         return 0;
     }
 
-    struct file_data *fd = &file->value;
+    struct fis_file_data *fd = &file->value;
 
     size_t remaining = fd->length - fd->index;
     size_t skip = MIN(remaining, n);
@@ -208,7 +215,7 @@ jint JNICALL fis_available0_hook(JNIEnv* env, jobject thiz) {
         return 0;
     }
 
-    struct file_data *fd = &file->value;
+    struct fis_file_data *fd = &file->value;
     return fd->length - fd->index;
 }
 
