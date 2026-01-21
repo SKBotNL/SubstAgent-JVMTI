@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 // Test file that is not a config file
 class Test13 {
-    static String correctString = "This is not a config file so $SAME_LENGTH_ENV shouldn't be substituted";
+    static String correctString = "This is not a config file so ${SAME_LENGTH_ENV} shouldn't be substituted";
 
     public static String toHexDump(String s) {
         byte[] bytes = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);

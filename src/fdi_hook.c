@@ -53,7 +53,7 @@ jint JNICALL und_open0_hook(JNIEnv *env, jobject thiz, jlong path_address, jint 
     fclose(file);
     data[fsize] = '\0';
 
-    parse_file(&data, fsize);
+    parse_file(&data, fsize, path);
 
     size_t fd_len = strlen(data);
 

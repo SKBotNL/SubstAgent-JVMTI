@@ -1,1 +1,1 @@
-Hi $SAME_LENGTH_ENV According to all known laws of aviation, there is no way a bee should be able to fly
+Hi ${SAME_LENGTH_ENV} According to all known laws of aviation, there is no way a bee should be able to fly

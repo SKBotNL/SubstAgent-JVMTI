@@ -1,1 +1,1 @@
-Hello $SAME_LENGTH_ENV
+Hello ${SAME_LENGTH_ENV}
