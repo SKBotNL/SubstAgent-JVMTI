@@ -92,7 +92,7 @@ void parse_file(char **data_ptr, size_t fsize, const char* filename) {
                 env_var[0] = '\0';
             }
         } else {
-            if (c == '$') {
+            if (c == '^') {
                 if (data[i+1] == '{') {
                     begin_env_index = i;
                     i++;
