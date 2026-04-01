@@ -120,13 +120,11 @@ static jint init_jvmti(JavaVM* vm) {
             }
         }
         free(line);
-    } else {
-        if (errno != ENOENT) {
-            perror("[SubstAgent] fopen failed");
-            exit(EXIT_FAILURE);
-        }
+        fclose(env_file);
+    } else if (errno != ENOENT) {
+        perror("[SubstAgent] fopen failed");
+        exit(EXIT_FAILURE);
     }
-    fclose(env_file);
 
     fprintf(stderr, "[SubstAgent] Loaded version %s\n", GIT_HASH);
 
