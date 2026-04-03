@@ -28,18 +28,18 @@ int is_config_path(const char* path) {
     return 0;
 }
 
-char* substitute(const char* value, int dollar_sign_matched_index, size_t i, size_t env_len, const char *data) {
+char* substitute(const char* value, int prefix_char_matched_index, size_t i, size_t env_len, const char *data) {
     size_t value_len = strlen(value);
     ssize_t len_diff = value_len - env_len;
 
     size_t data_len = strlen(data);
     size_t new_len = data_len+len_diff;
     char* new_data = malloc(new_len + 1);
-    size_t after_len = new_len - dollar_sign_matched_index - value_len;
-    memcpy(new_data, data, dollar_sign_matched_index);
-    memcpy(new_data+dollar_sign_matched_index, value, value_len);
-    memcpy(new_data+dollar_sign_matched_index+value_len, data+i, after_len);
-    assert(dollar_sign_matched_index+value_len+after_len == new_len);
+    size_t after_len = new_len - prefix_char_matched_index - value_len;
+    memcpy(new_data, data, prefix_char_matched_index);
+    memcpy(new_data+prefix_char_matched_index, value, value_len);
+    memcpy(new_data+prefix_char_matched_index+value_len, data+i, after_len);
+    assert(prefix_char_matched_index+value_len+after_len == new_len);
     new_data[new_len] = '\0';
     return new_data;
 }
@@ -73,11 +73,11 @@ void parse_file(char **data_ptr, size_t fsize, const char* filename) {
                 }
 
                 // +1 for the closing }
-                size_t afterClosingTagIndex = i + 1;
+                size_t after_closing_tag_index = i + 1;
 
-                size_t env_len = afterClosingTagIndex - begin_env_index;
+                size_t env_len = after_closing_tag_index - begin_env_index;
 
-                char* new_data = substitute(value, begin_env_index, afterClosingTagIndex, env_len, data);
+                char* new_data = substitute(value, begin_env_index, after_closing_tag_index, env_len, data);
                 free(data);
                 data = new_data;
                 *data_ptr = new_data;
