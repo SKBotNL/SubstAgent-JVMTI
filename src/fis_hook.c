@@ -18,7 +18,6 @@ struct fis_file_data {
   char *data;
   size_t index;
   size_t length;
-  int freed;
 };
 
 struct file {
@@ -39,7 +38,7 @@ jint JNICALL fis_readBytes_hook(JNIEnv *env, jobject thiz, jbyteArray buf,
   jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
   struct file *file = hmgetp_null(fis_files_map, hash);
-  if (file == NULL || file->value.freed) {
+  if (file == NULL || file->value.data == NULL) {
     return -1;
   }
 
@@ -63,7 +62,6 @@ jint JNICALL fis_readBytes_hook(JNIEnv *env, jobject thiz, jbyteArray buf,
   if (fd->index == fd->length) {
     free(fd->data);
     fd->data = NULL;
-    fd->freed = 1;
   }
 
   return len_to_read;
@@ -120,7 +118,6 @@ void JNICALL fis_open0_hook(JNIEnv *env, jobject thiz, jstring jpath) {
   file_data.data = data;
   file_data.length = fd_len;
   file_data.index = 0;
-  file_data.freed = 0;
   hmput(fis_files_map, hash, file_data);
   (*env)->ReleaseStringUTFChars(env, jpath, path);
 }
@@ -137,7 +134,7 @@ jint JNICALL fis_read0_hook(JNIEnv *env, jobject thiz) {
   jint hash = (*env)->CallIntMethod(env, thiz, hash_code_method);
 
   struct file *file = hmgetp_null(fis_files_map, hash);
-  if (file == NULL || file->value.freed) {
+  if (file == NULL || file->value.data == NULL) {
     return -1;
   }
 
@@ -146,7 +143,6 @@ jint JNICALL fis_read0_hook(JNIEnv *env, jobject thiz) {
   if (fd->data[fd->index] == '\0') {
     free(fd->data);
     fd->data = NULL;
-    fd->freed = 1;
   }
   return read_byte;
 }
@@ -213,7 +209,6 @@ jlong JNICALL fis_skip0_hook(JNIEnv *env, jobject thiz, jlong n) {
   if (skip == remaining) {
     free(fd->data);
     fd->data = NULL;
-    fd->freed = 1;
     return skip;
   }
 
@@ -258,6 +253,5 @@ void JNICALL fis_close_hook(JNIEnv *env, jobject thiz) {
 
   free(file->value.data);
   file->value.data = NULL;
-  file->value.freed = 1;
   return;
 }

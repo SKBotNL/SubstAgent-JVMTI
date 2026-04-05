@@ -14,7 +14,6 @@ struct fdi_file_data {
   char *data;
   size_t index;
   size_t length;
-  int freed;
   size_t inode;
   size_t device;
 };
@@ -62,7 +61,6 @@ jint JNICALL und_open0_hook(JNIEnv *env, jobject thiz, jlong path_address,
   file_data.data = data;
   file_data.length = fd_len;
   file_data.index = 0;
-  file_data.freed = 0;
   file_data.inode = st.st_ino;
   file_data.device = st.st_dev;
   hmput(fdi_files_map, fd, file_data);
@@ -103,14 +101,13 @@ jint JNICALL fdi_read0_hook(JNIEnv *env, jobject thiz, jobject fdObject,
     return fdi_real_read0(env, thiz, fdObject, address, len);
   }
 
-  if (file_data->freed) {
+  if (file_data->data == NULL) {
     return -1;
   }
 
   if (file_data->length == 0) {
     free(file_data->data);
     file_data->data = NULL;
-    file_data->freed = 1;
     return -1;
   }
 
@@ -120,7 +117,6 @@ jint JNICALL fdi_read0_hook(JNIEnv *env, jobject thiz, jobject fdObject,
   if (n == file_data->length - file_data->index) {
     free(file_data->data);
     file_data->data = NULL;
-    file_data->freed = 1;
   } else {
     file_data->index += n;
   }
