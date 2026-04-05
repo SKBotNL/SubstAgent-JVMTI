@@ -13,10 +13,8 @@ You can now use environment variables in your config files like so:\
 ```
 $ git clone https://github.com/SKBotNL/SubstAgent-JVMTI
 $ cd SubstAgent-JVMTI
-$ mkdir build
-$ cd build
-$ cmake ..
-$ make
+$ cmake -B build -G "Unix Makefiles"
+$ cmake --build build
 ```
 
 # Tests
