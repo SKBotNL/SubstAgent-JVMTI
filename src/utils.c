@@ -28,10 +28,7 @@ int is_config_path(const char* path) {
     return 0;
 }
 
-char* substitute(const char* value, int prefix_char_matched_index, size_t i, size_t env_len, const char *data) {
-    size_t value_len = strlen(value);
-    ssize_t len_diff = value_len - env_len;
-
+char* substitute(const char* value, int prefix_char_matched_index, size_t i, size_t value_len, size_t len_diff, const char *data) {
     size_t data_len = strlen(data);
     size_t new_len = data_len+len_diff;
     char* new_data = malloc(new_len + 1);
@@ -77,12 +74,18 @@ void parse_file(char **data_ptr, size_t fsize, const char* filename) {
 
                 size_t env_len = after_closing_tag_index - begin_env_index;
 
-                char* new_data = substitute(value, begin_env_index, after_closing_tag_index, env_len, data);
+                size_t value_len = strlen(value);
+                ssize_t len_diff = value_len - env_len;
+
+                char* new_data = substitute(value, begin_env_index, after_closing_tag_index, value_len, len_diff, data);
                 free(data);
                 data = new_data;
                 *data_ptr = new_data;
 
                 fprintf(stderr, "\033[0G[SubstAgent] Successfully expanded environment variable \"%s\" in file %s on line %d\n", env_var, filename, line_count);
+                
+                fsize += len_diff;
+                i += len_diff;
                 begin_env_index = -1;
                 env_var[0] = '\0';
                 continue;
