@@ -209,7 +209,6 @@ jlong JNICALL fis_skip0_hook(JNIEnv *env, jobject thiz, jlong n) {
   if (skip == remaining) {
     free(fd->data);
     fd->data = NULL;
-    return skip;
   }
 
   return skip;
