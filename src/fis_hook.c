@@ -139,8 +139,8 @@ jint JNICALL fis_read0_hook(JNIEnv *env, jobject thiz) {
   }
 
   struct fis_file_data *fd = &file->value;
-  char read_byte = fd->data[fd->index++];
-  if (fd->data[fd->index] == '\0') {
+  jint read_byte = (unsigned char)fd->data[fd->index++];
+  if (fd->index >= fd->length) {
     free(fd->data);
     fd->data = NULL;
   }
