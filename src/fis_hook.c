@@ -168,7 +168,7 @@ jlong JNICALL fis_length0_hook(JNIEnv *env, jobject thiz) {
 
 jlong JNICALL fis_position0_hook(JNIEnv *env, jobject thiz) {
   if (!has_tag(thiz)) {
-    return fis_real_length0(env, thiz);
+    return fis_real_position0(env, thiz);
   }
 
   jclass class = (*env)->GetObjectClass(env, thiz);
