@@ -1,1 +1,1 @@
-Hello ${LONGER_ENV}
+Hello ^{LONGER_ENV}
