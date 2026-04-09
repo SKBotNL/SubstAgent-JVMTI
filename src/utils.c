@@ -47,7 +47,6 @@ char *substitute(const char *value, int prefix_char_matched_index, size_t i,
 void parse_file(char **data_ptr, size_t fsize, const char *filename) {
   char *data = *data_ptr;
   int line_count = 1;
-  ;
   int begin_env_index = -1;
   char env_var[4096];
   env_var[0] = '\0';
@@ -123,7 +122,7 @@ void parse_file(char **data_ptr, size_t fsize, const char *filename) {
       }
     } else {
       if (c == '^') {
-        if (data[i + 1] == '{') {
+        if (i + 1 < fsize && data[i + 1] == '{') {
           begin_env_index = i;
           i++;
         }
