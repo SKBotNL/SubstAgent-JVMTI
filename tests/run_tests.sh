@@ -21,7 +21,7 @@ TEST_DESCRIPTIONS=(
 # Build SubstAgent
 echo -n "Compiling SubstAgent..."
 cd ../build
-output=$(make 2>&1)
+output=$(cmake --build . 2>&1)
 if [ $? -ne 0 ]; then
     echo -e "\e[0;31mBuild failed\e[0m"
     echo "$output"

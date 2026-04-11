@@ -13,9 +13,9 @@ You can now use environment variables in your config files like so:\
 ```
 $ git clone https://github.com/SKBotNL/SubstAgent-JVMTI
 $ cd SubstAgent-JVMTI
-$ cmake -B build -G "Unix Makefiles"
+$ cmake -B build
 $ cmake --build build
 ```
 
 # Tests
-The test script assumes that the generator is set to make (`-G "Unix Makefiles"`)
+The tests can be run by executing the `run_tests.sh` script.
