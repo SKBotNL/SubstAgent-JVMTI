@@ -21,7 +21,7 @@ int has_tag(jobject obj) {
 }
 
 int is_config_path(const char *path) {
-  char *extString = strrchr(path, '.');
+  const char *extString = strrchr(path, '.');
   if (extString) {
     return strcmp(extString, ".yml") == 0 || strcmp(extString, ".yaml") == 0 ||
            strcmp(extString, ".json") == 0 || strcmp(extString, ".txt") == 0 ||
